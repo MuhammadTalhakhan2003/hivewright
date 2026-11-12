@@ -6,6 +6,7 @@ import { ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react'
 import {
   ClerkLoaded, ClerkLoading, ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useAuth, useUser,
 } from '@clerk/clerk-react'
+import { dark } from '@clerk/themes'
 import { AUTH_ENABLED, setTokenGetter } from './api'
 import { BRAND } from './brand'
 import { go } from './router'
@@ -14,7 +15,9 @@ import { Button, Logo } from '../components/ui'
 const PK = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 // Clerk's modal and user menu, dressed in Hivewright's graphite and sunshine yellow.
+// The dark base theme also inverts black provider logos (GitHub, Apple, X) so they stay visible.
 const appearance = {
+  baseTheme: dark,
   variables: {
     colorPrimary: '#FFC928',
     colorTextOnPrimaryBackground: '#1C1D20',
