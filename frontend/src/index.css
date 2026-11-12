@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #1c1d20;          /* Deep Graphite */
+  --color-ink-2: #222327;
+  --color-ink-3: #2a2b30;
+  --color-ink-4: #34353b;
+  --color-line: #33353b;
+  --color-cloud: #f2f4f1;        /* Soft Cloud White */
+  --color-mute: #9d9f9a;
+  --color-dim: #6c6e6a;
+  --color-sun: #ffc928;          /* Sunshine Yellow */
+  --color-sun-2: #ffb703;
+  --color-sky: #8db9f0;          /* Powder Blue */
+  --color-peach: #f5b69e;        /* Warm Sunset Peach */
+  --color-lav: #e9e8f8;          /* Soft Lavender White */
+  --color-ok: #7ee2a0;
+  --color-err: #ff7a6b;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --animate-marquee: marquee 38s linear infinite;
+  --animate-shimmer: shimmer 2.8s ease-in-out infinite;
+  --animate-dash: dash 1.1s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-page-in: page-in .35s cubic-bezier(.16, 1, .3, 1) both;
+
+  @keyframes page-in { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+
+  @keyframes marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+  @keyframes shimmer { 0% { transform: translateX(-120%) } 60%, 100% { transform: translateX(220%) } }
+  @keyframes dash { to { stroke-dashoffset: -16 } }
+  @keyframes float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--color-ink);
+  color: var(--color-cloud);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--color-sun); color: var(--color-ink); }
+
+* { scrollbar-width: thin; scrollbar-color: #3a3b41 transparent; }
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(242 244 241 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(242 244 241 / 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 40%, transparent 100%);
+}
+
+.noise::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Markdown rendering */
+.md { line-height: 1.65; font-size: .925rem; color: #dfe1dc; overflow-wrap: anywhere; }
+.md > * + * { margin-top: .75em; }
+.md h1, .md h2, .md h3, .md h4 { font-family: var(--font-display); color: var(--color-cloud); font-weight: 600; line-height: 1.25; margin-top: 1.3em; }
+.md h1 { font-size: 1.5rem; } .md h2 { font-size: 1.25rem; } .md h3 { font-size: 1.05rem; } .md h4 { font-size: .95rem; }
+.md > :first-child { margin-top: 0; }
+.md a { color: var(--color-sun); text-decoration: underline; text-underline-offset: 3px; }
+.md strong { color: var(--color-cloud); }
+.md ul, .md ol { padding-left: 1.3em; }
+.md ul { list-style: disc; } .md ol { list-style: decimal; }
+.md li + li { margin-top: .25em; }
+.md li::marker { color: var(--color-sun); }
+.md code { font-family: var(--font-mono); font-size: .85em; background: #2a2b30; padding: .12em .4em; border-radius: 6px; }
+.md pre { background: #17181a; border: 1px solid var(--color-line); border-radius: 12px; padding: 1em; overflow-x: auto; }
+.md pre code { background: none; padding: 0; }
+.md blockquote { border-left: 3px solid var(--color-sun); padding-left: 1em; color: var(--color-mute); }
+.md table { width: 100%; border-collapse: collapse; font-size: .875rem; display: block; overflow-x: auto; }
+.md th, .md td { border: 1px solid var(--color-line); padding: .45em .7em; text-align: left; }
+.md th { background: #2a2b30; }
+.md hr { border-color: var(--color-line); }
+.md-sm { font-size: .84rem; line-height: 1.55; }
+.md-sm h1, .md-sm h2, .md-sm h3 { font-size: .95rem; margin-top: .8em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
