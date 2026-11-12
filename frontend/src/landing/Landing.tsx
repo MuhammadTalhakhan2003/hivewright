@@ -11,6 +11,7 @@ import {
 } from '../components/ui'
 import { BRAND } from '../lib/brand'
 import { go, scrollToId, setPrefill } from '../lib/router'
+import { NavAuth } from '../lib/auth'
 
 const NAV = [
   ['features', 'Features'], ['how', 'How it works'], ['usecases', 'Use cases'], ['pricing', 'Pricing'], ['faq', 'FAQ'],
@@ -47,7 +48,7 @@ function Nav() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="max-sm:hidden" onClick={() => go('/app')}>Sign in</Button>
+          <NavAuth />
           <Button size="sm" onClick={() => go('/app')}>Get started <ArrowRight size={14} /></Button>
           <button className="ml-1 rounded-full p-2 text-mute md:hidden" onClick={() => setOpen((v) => !v)} aria-label="Menu">
             {open ? <X size={18} /> : <Menu size={18} />}

@@ -4,6 +4,17 @@ import type { Plan, Provider } from './types'
 // In production it points at the hosted runtime, e.g. https://hivewright-api.onrender.com
 export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
 
+/** Sign-in is on when the Clerk publishable key is configured at build time. */
+export const AUTH_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
+
+// Set by <TokenBridge> inside ClerkProvider; plain modules can then attach the session token.
+let tokenGetter: (() => Promise<string | null>) | null = null
+export function setTokenGetter(fn: (() => Promise<string | null>) | null) { tokenGetter = fn }
+export async function authHeaders(): Promise<Record<string, string>> {
+  const t = tokenGetter ? await tokenGetter().catch(() => null) : null
+  return t ? { Authorization: `Bearer ${t}` } : {}
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)

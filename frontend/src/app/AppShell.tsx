@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { CreditCard, Crown, Home, Menu, Plus, Server, X } from 'lucide-react'
 import clsx from 'clsx'
 import { AppProvider, useApp } from './store'
+import { AuthGate, UserBadge } from '../lib/auth'
 import Composer from './Composer'
 import RunView from './RunView'
 import Billing from './Billing'
@@ -87,6 +88,7 @@ function Sidebar({ route, onNavigate }: { route: string; onNavigate: () => void 
           )}
         </div>
       )}
+      <UserBadge />
       <a href={BRAND.authorUrl} target="_blank" rel="noopener noreferrer"
         className="mx-3 mb-3 -mt-1 block rounded-xl px-2 py-1.5 text-center text-[11.5px] text-dim transition-colors hover:text-cloud">
         Built by <span className="text-mute underline decoration-sun/50 underline-offset-2">{BRAND.author}</span> 🐝
@@ -152,5 +154,5 @@ function Shell({ route }: { route: string }) {
 }
 
 export default function AppShell({ route }: { route: string }) {
-  return <AppProvider><Shell route={route} /></AppProvider>
+  return <AuthGate><AppProvider><Shell route={route} /></AppProvider></AuthGate>
 }

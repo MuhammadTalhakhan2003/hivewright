@@ -106,6 +106,8 @@ The runtime is **stateless**: a whole society runs inside one request and stream
 | Runtime (FastAPI) | **Render** free web service | [`render.yaml`](render.yaml) blueprint. Set `GROQ_API_KEY` when prompted. |
 | Web app | **Vercel** | Root directory `frontend`, env `VITE_API_URL=https://<your-render-service>.onrender.com` |
 
+**Sign-in (Clerk, optional).** Set `VITE_CLERK_PUBLISHABLE_KEY` on Vercel and `HIVEWRIGHT_CLERK_PUBLISHABLE_KEY` on Render (the same public `pk_…` key). The dashboard then requires sign-in, and the backend verifies each Clerk session token against Clerk's public JWKS, so no secret key is needed server-side. Free runs on the house key become per account instead of per IP.
+
 Visitors get a few free real runs per day on the server's key (`HIVEWRIGHT_HOUSE_RUNS_PER_IP`, default 5) and can paste their own free Groq key for unlimited runs. That key stays in their browser and is never stored server-side. The free Render instance sleeps when idle, so the first visit can take about a minute while it wakes up.
 
 ## Status & roadmap

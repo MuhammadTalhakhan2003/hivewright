@@ -1,7 +1,7 @@
 // Client-side run store. A run executes inside one streaming POST to the
 // runtime; events are kept in memory while live and saved to localStorage.
 import { useMemo, useSyncExternalStore } from 'react'
-import { API_BASE, ApiError } from './api'
+import { API_BASE, ApiError, authHeaders } from './api'
 import { addTokens, getOwnKey, recordRun } from './account'
 import { applyEvent, emptyRun, type RunState } from './run'
 import type { HivewrightEvent, RunSummary } from './types'
@@ -85,7 +85,7 @@ export function startRun(req: { task: string; provider?: string; model?: string;
   return new Promise((resolve, reject) => {
     void (async () => {
       const ownKey = getOwnKey()
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(await authHeaders()) }
       if (ownKey && req.provider === 'groq') headers['X-Provider-Key'] = ownKey
       let res: Response
       try {

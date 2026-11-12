@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import auth
 from .config import DEFAULT_PROVIDER, FRONTEND_DIST, HOUSE_RUNS_PER_IP_PER_DAY, MAX_CONCURRENT_RUNS
 from .plans import FAST_MODELS, PLANS, plan_dict
 from .providers import SPECS, ProviderError, make_provider
@@ -31,7 +32,7 @@ app.add_middleware(
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", *_extra],
     allow_origin_regex=r"https://hivewright[a-z0-9\-]*\.vercel\.app",
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "X-Provider-Key"],
+    allow_headers=["Content-Type", "X-Provider-Key", "Authorization"],
 )
 
 # Best-effort guards (per server instance) for runs on the house key.
@@ -61,6 +62,7 @@ async def providers() -> dict:
         "providers": [s.to_dict() for s in SPECS.values()],
         "fast_models": sorted(FAST_MODELS),
         "house_runs_per_day": HOUSE_RUNS_PER_IP_PER_DAY,
+        "auth_enabled": auth.ENABLED,
     }
 
 
@@ -94,9 +96,14 @@ class SocietyRequest(BaseModel):
 
 @app.post("/api/society")
 async def run_society(body: SocietyRequest, request: Request,
-                      x_provider_key: str | None = Header(default=None)):
+                      x_provider_key: str | None = Header(default=None),
+                      authorization: str | None = Header(default=None)):
     """Runs a whole society inside this request and streams its events (SSE)."""
     global _active_runs
+    try:
+        user_id = await auth.user_from_header(authorization)
+    except auth.AuthError:
+        raise HTTPException(401, "Your session expired. Please sign in again.")
     provider = body.provider or _default_provider()
     spec = SPECS.get(provider)
     if spec is None:
@@ -113,8 +120,11 @@ async def run_society(body: SocietyRequest, request: Request,
         raise HTTPException(400, "That API key doesn't look valid.")
     on_house_key = provider not in ("mock", "ollama") and not own_key
 
+    if on_house_key and auth.ENABLED and not user_id:
+        raise HTTPException(401, "Sign in to run on our key, or add your own free Groq key.")
     if on_house_key:
-        ip, today = _client_ip(request), time.strftime("%Y-%m-%d")
+        # Cap per signed-in account when Clerk is on (much harder to dodge than an IP), else per IP.
+        ip, today = (f"user:{user_id}" if user_id else _client_ip(request)), time.strftime("%Y-%m-%d")
         day, count = _ip_usage.get(ip, (today, 0))
         if day != today:
             count = 0
