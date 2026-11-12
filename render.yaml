@@ -21,3 +21,7 @@ services:
         value: "5"
       - key: HIVEWRIGHT_MAX_CONCURRENT_RUNS
         value: "4"
+      # Clerk publishable key: public by design (it only identifies the Clerk instance),
+      # used to verify session tokens against Clerk's public JWKS. No secret key needed.
+      - key: HIVEWRIGHT_CLERK_PUBLISHABLE_KEY
+        value: pk_test_c2luY2VyZS1tb29zZS01MDMyLmNsZXJrLmFjY291bnRzLmRldiQ
