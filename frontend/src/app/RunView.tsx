@@ -4,9 +4,9 @@ import {
   Bot, Brain, Check, Clock, Coins, Copy, Crown, Download, MessagesSquare, Network, RotateCcw, Trash2, TriangleAlert, X,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { PHASES, isActive, phaseIndex, useRun, type RunState } from '../lib/run'
+import { PHASES, isActive, phaseIndex, type RunState } from '../lib/run'
+import { deleteRun, useRun } from '../lib/runs'
 import { KIND_COLOR, STATUS_COLOR } from '../lib/brand'
-import { api } from '../lib/api'
 import { go, setPrefill } from '../lib/router'
 import { Badge, Button, Card, LiveNumber, Markdown, PulseDot } from '../components/ui'
 import SocietyGraph from './SocietyGraph'
@@ -217,7 +217,7 @@ function toMarkdown(s: RunState, name: (id: string) => string) {
 
 export default function RunView({ id }: { id: string }) {
   const s = useRun(id)
-  const { account, refreshRuns } = useApp()
+  const { account } = useApp()
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('feed')
   const [sel, setSel] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -247,8 +247,18 @@ export default function RunView({ id }: { id: string }) {
     a.click()
     URL.revokeObjectURL(a.href)
   }
-  const del = async () => {
-    try { await api.deleteRun(id); await refreshRuns(); go('/app/new') } catch { /* still running */ }
+  const del = () => { deleteRun(id); go('/app/new') }
+
+  if (s.missing) {
+    return (
+      <div className="grid h-[60vh] place-items-center px-4 text-center">
+        <div>
+          <p className="font-display text-xl">This run isn't in this browser.</p>
+          <p className="mt-2 text-sm text-mute">Run history is saved on the device that started it.</p>
+          <Button className="mt-6" onClick={() => go('/app/new')}>Start a new run</Button>
+        </div>
+      </div>
+    )
   }
 
   if (!s.summary && s.seq === 0) {

@@ -84,9 +84,11 @@ SPECS: dict[str, ProviderSpec] = {
 
 
 class OpenAICompatProvider:
-    def __init__(self, spec: ProviderSpec, model: str) -> None:
+    def __init__(self, spec: ProviderSpec, model: str, api_key: str | None = None) -> None:
         self.spec = spec
         self.name = spec.name
+        # A visitor's own key (bring-your-own-key) overrides the server's key for this run only.
+        self.api_key = api_key or spec.api_key
         self.model = model
         # Max tokens (prompt + reply) per request. Groq's free tier caps a minute at 8k tokens,
         # so a single request must stay below that. Raise via env on paid tiers.
@@ -110,8 +112,8 @@ class OpenAICompatProvider:
             payload["max_tokens"] = max_tokens + 4000
         payload["max_tokens"] = self._fit(messages, payload["max_tokens"])
         headers = {"Content-Type": "application/json"}
-        if self.spec.api_key:
-            headers["Authorization"] = f"Bearer {self.spec.api_key}"
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
         last_err = "unknown error"
         for attempt in range(5):
@@ -163,7 +165,7 @@ class OpenAICompatProvider:
         return max(600, min(max_tokens, self.request_budget - est_prompt))
 
     async def list_models(self) -> list[str]:
-        headers = {"Authorization": f"Bearer {self.spec.api_key}"} if self.spec.api_key else {}
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         r = await self._client.get(f"{self.spec.base_url}/models", headers=headers)
         r.raise_for_status()
         ids = [m["id"] for m in r.json().get("data", []) if isinstance(m, dict) and "id" in m]
@@ -251,12 +253,12 @@ class MockProvider:
         return None
 
 
-def make_provider(name: str, model: str | None = None):
+def make_provider(name: str, model: str | None = None, api_key: str | None = None):
     spec = SPECS.get(name)
     if spec is None:
         raise ProviderError(f"Unknown provider '{name}'")
     if name == "mock":
         return MockProvider(model or spec.model)
-    if not spec.configured:
-        raise ProviderError(f"{spec.label} is not configured — set {spec.key_env} in backend/.env")
-    return OpenAICompatProvider(spec, model or spec.model)
+    if not spec.configured and not api_key:
+        raise ProviderError(f"{spec.label} is not configured. Add your own {spec.label} key in Providers.")
+    return OpenAICompatProvider(spec, model or spec.model, api_key=api_key)

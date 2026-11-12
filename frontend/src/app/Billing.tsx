@@ -1,29 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Crown, Info, Loader2, PartyPopper } from 'lucide-react'
 import clsx from 'clsx'
-import { api } from '../lib/api'
-import type { Plan } from '../lib/types'
 import { useApp } from './store'
 import { Button, Card, Eyebrow, NumberTicker } from '../components/ui'
 
 export default function Billing() {
-  const { account, refreshAccount } = useApp()
-  const [plans, setPlans] = useState<Plan[]>([])
-  const [busy, setBusy] = useState<string | null>(null)
+  const { account, plans, setPlan } = useApp()
+  const [busy] = useState<string | null>(null)
   const [celebrate, setCelebrate] = useState(false)
 
-  useEffect(() => { api.plans().then((r) => setPlans(r.plans)).catch(() => {}) }, [])
-
-  const choose = async (id: string) => {
-    setBusy(id)
-    try {
-      await api.setPlan(id)
-      await refreshAccount()
-      if (id === 'pro') { setCelebrate(true); setTimeout(() => setCelebrate(false), 2600) }
-    } finally {
-      setBusy(null)
-    }
+  const choose = (id: string) => {
+    setPlan(id as 'free' | 'pro')
+    if (id === 'pro') { setCelebrate(true); setTimeout(() => setCelebrate(false), 2600) }
   }
 
   const u = account?.usage

@@ -97,7 +97,7 @@ function Sidebar({ route, onNavigate }: { route: string; onNavigate: () => void 
 
 function Shell({ route }: { route: string }) {
   const [open, setOpen] = useState(false)
-  const { offline } = useApp()
+  const { conn } = useApp()
   useEffect(() => setOpen(false), [route])
   const runId = route.startsWith('/app/run/') ? route.slice('/app/run/'.length) : null
 
@@ -129,9 +129,15 @@ function Shell({ route }: { route: string }) {
           <button onClick={() => setOpen(true)} className="p-1.5 text-mute" aria-label="Open menu"><Menu size={20} /></button>
           <Logo size={24} /><span className="font-display font-semibold">{BRAND.name}</span>
         </div>
-        {offline && (
+        {conn === 'waking' && (
+          <div className="flex items-center justify-center gap-2 border-b border-sun/30 bg-sun/10 px-4 py-2 text-center text-[13px] text-cloud">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-sun" />
+            Waking up the hive… the free server naps when nobody's around. This takes up to a minute. 🐝
+          </div>
+        )}
+        {conn === 'offline' && (
           <div className="border-b border-err/30 bg-err/10 px-4 py-2 text-center text-[13px] text-err">
-            Can't reach the runtime. Start the backend: <code className="font-mono">uvicorn hivewright.api:app --port 8000</code>
+            Can't reach the Hivewright runtime right now. Simulation and saved runs still work once it's back. Retrying…
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto">

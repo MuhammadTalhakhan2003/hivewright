@@ -1,51 +1,89 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../lib/api'
-import type { Account, Provider, RunSummary } from '../lib/types'
+import { getOwnKey, loadAccount, setOwnKey as saveOwnKey, setPlan as savePlan } from '../lib/account'
+import { listRuns, useRunsVersion } from '../lib/runs'
+import type { Account, Plan, Provider, RunSummary } from '../lib/types'
+
+type Conn = 'connecting' | 'waking' | 'online' | 'offline'
 
 interface Ctx {
   account: Account | null
+  plans: Plan[]
   providers: Provider[]
   defaultProvider: string
   fastModels: string[]
   runs: RunSummary[]
-  offline: boolean
-  refreshAccount: () => Promise<void>
-  refreshRuns: () => Promise<void>
+  conn: Conn
+  ownKey: string
+  houseRunsLeft: number
+  houseRunsPerDay: number
+  refreshAccount: () => void
+  setPlan: (id: 'free' | 'pro') => void
+  setOwnKey: (k: string) => void
 }
 
 const AppCtx = createContext<Ctx | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [account, setAccount] = useState<Account | null>(null)
+  const [plans, setPlans] = useState<Plan[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
   // Empty until /api/providers answers, so the composer doesn't lock onto a placeholder.
   const [defaultProvider, setDefault] = useState('')
   const [fastModels, setFast] = useState<string[]>([])
-  const [runs, setRuns] = useState<RunSummary[]>([])
-  const [offline, setOffline] = useState(false)
+  const [houseRunsPerDay, setHousePerDay] = useState(5)
+  const [conn, setConn] = useState<Conn>('connecting')
+  const [acct, setAcct] = useState(loadAccount)
+  const [ownKey, setOwnKeyState] = useState(getOwnKey)
+  const runsVersion = useRunsVersion()
 
-  const refreshAccount = useCallback(async () => {
-    try { setAccount(await api.account()); setOffline(false) } catch { setOffline(true) }
-  }, [])
-  const refreshRuns = useCallback(async () => {
-    try { setRuns((await api.runs()).runs); setOffline(false) } catch { setOffline(true) }
-  }, [])
-
+  // Free hosting sleeps when idle: keep retrying for ~90s while it wakes up.
   useEffect(() => {
-    refreshAccount()
-    refreshRuns()
-    api.providers().then((p) => { setProviders(p.providers); setDefault(p.default); setFast(p.fast_models) }).catch(() => setOffline(true))
-  }, [refreshAccount, refreshRuns])
+    let alive = true
+    const started = Date.now()
+    const connect = async () => {
+      while (alive) {
+        try {
+          const [p, pl] = await Promise.all([api.providers(), api.plans()])
+          if (!alive) return
+          setProviders(p.providers); setDefault(p.default); setFast(p.fast_models)
+          setHousePerDay(p.house_runs_per_day ?? 5); setPlans(pl.plans); setConn('online')
+          return
+        } catch {
+          if (!alive) return
+          const waited = Date.now() - started
+          setConn(waited > 90_000 ? 'offline' : waited > 2_500 ? 'waking' : 'connecting')
+          await new Promise((r) => setTimeout(r, waited > 90_000 ? 15_000 : 3_000))
+        }
+      }
+    }
+    connect()
+    return () => { alive = false }
+  }, [])
 
-  // Poll while something is running so the sidebar statuses stay fresh.
-  const anyActive = runs.some((r) => r.status !== 'completed' && r.status !== 'failed')
-  useEffect(() => {
-    const t = setInterval(() => { refreshRuns(); if (anyActive) refreshAccount() }, anyActive ? 2500 : 10000)
-    return () => clearInterval(t)
-  }, [anyActive, refreshRuns, refreshAccount])
+  const refreshAccount = useCallback(() => setAcct(loadAccount()), [])
+  // Usage changes whenever a run starts or finishes.
+  useEffect(() => { refreshAccount() }, [runsVersion, refreshAccount])
+
+  const runs = useMemo(() => listRuns(), [runsVersion])
+
+  const account: Account | null = useMemo(() => {
+    const plan = plans.find((p) => p.id === acct.plan_id) ?? plans[0]
+    if (!plan) return null
+    return {
+      plan,
+      usage: { runs_today: acct.runs_today, runs_per_day: plan.runs_per_day, total_runs: acct.total_runs, total_tokens: acct.total_tokens },
+    }
+  }, [plans, acct])
+
+  const setPlan = useCallback((id: 'free' | 'pro') => { savePlan(id); setAcct(loadAccount()) }, [])
+  const setOwnKey = useCallback((k: string) => { saveOwnKey(k.trim()); setOwnKeyState(k.trim()) }, [])
 
   return (
-    <AppCtx.Provider value={{ account, providers, defaultProvider, fastModels, runs, offline, refreshAccount, refreshRuns }}>
+    <AppCtx.Provider value={{
+      account, plans, providers, defaultProvider, fastModels, runs, conn, ownKey,
+      houseRunsLeft: Math.max(0, houseRunsPerDay - acct.house_runs_today), houseRunsPerDay,
+      refreshAccount, setPlan, setOwnKey,
+    }}>
       {children}
     </AppCtx.Provider>
   )

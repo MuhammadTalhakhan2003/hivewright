@@ -1,4 +1,8 @@
-import type { Account, Plan, Provider, RunSummary } from './types'
+import type { Plan, Provider } from './types'
+
+// Backend origin. Empty = same origin (local dev via the Vite proxy).
+// In production it points at the hosted runtime, e.g. https://hivewright-api.onrender.com
+export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -9,9 +13,9 @@ export class ApiError extends Error {
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   let r: Response
   try {
-    r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init })
+    r = await fetch(API_BASE + path, { headers: { 'Content-Type': 'application/json' }, ...init })
   } catch {
-    throw new ApiError(0, 'Cannot reach the Hivewright runtime. Is the backend running on port 8000?')
+    throw new ApiError(0, 'Cannot reach the Hivewright runtime.')
   }
   if (!r.ok) {
     let msg: string = r.statusText
@@ -25,14 +29,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  providers: () => req<{ default: string; providers: Provider[]; fast_models: string[] }>('/api/providers'),
+  providers: () => req<{ default: string; providers: Provider[]; fast_models: string[]; house_runs_per_day: number }>('/api/providers'),
   models: (name: string) => req<{ models: string[]; live: boolean }>(`/api/providers/${name}/models`),
-  account: () => req<Account>('/api/account'),
   plans: () => req<{ plans: Plan[] }>('/api/plans'),
-  setPlan: (plan_id: string) =>
-    req<Account>('/api/account/plan', { method: 'POST', body: JSON.stringify({ plan_id }) }),
-  runs: () => req<{ runs: RunSummary[] }>('/api/runs'),
-  createRun: (task: string, provider?: string, model?: string) =>
-    req<RunSummary>('/api/runs', { method: 'POST', body: JSON.stringify({ task, provider, model }) }),
-  deleteRun: (id: string) => req<{ ok: boolean }>(`/api/runs/${id}`, { method: 'DELETE' }),
+  health: () => req<{ ok: boolean; default_provider: string }>('/api/health'),
 }

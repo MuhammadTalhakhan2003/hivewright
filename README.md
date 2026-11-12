@@ -86,13 +86,23 @@ Single-port, production-style: `cd frontend; npm run build`, then run only the b
 
 ## API
 
+The runtime is **stateless**: a whole society runs inside one request and streams back, so it fits free hosting that restarts or sleeps. Run history and plan usage live in the visitor's browser.
+
 | Method | Path | |
 |---|---|---|
-| `POST` | `/api/runs` | `{task, provider?, model?}` starts a society run |
-| `GET` | `/api/runs/{id}/stream` | SSE: replays the full event history, then follows live |
-| `GET` | `/api/runs` · `/api/runs/{id}` | list · snapshot |
-| `GET` | `/api/providers` | provider catalog and configuration status |
-| `GET/POST` | `/api/account` · `/api/account/plan` | usage and plan (demo billing) |
+| `POST` | `/api/society` | `{task, provider?, model?, plan_id?}` runs a society and streams its events (SSE). Optional `X-Provider-Key` header = the visitor's own key. |
+| `GET` | `/api/providers` | provider catalog, configuration status, free-run allowance |
+| `GET` | `/api/providers/{name}/models` | live model list |
+| `GET` | `/api/plans` | Free / Pro plan definitions |
+
+## Deploy (free)
+
+| Part | Host | How |
+|---|---|---|
+| Runtime (FastAPI) | **Render** free web service | [`render.yaml`](render.yaml) blueprint. Set `GROQ_API_KEY` when prompted. |
+| Web app | **Vercel** | Root directory `frontend`, env `VITE_API_URL=https://<your-render-service>.onrender.com` |
+
+Visitors get a few free real runs per day on the server's key (`HIVEWRIGHT_HOUSE_RUNS_PER_IP`, default 5) and can paste their own free Groq key for unlimited runs. That key stays in their browser and is never stored server-side. The free Render instance sleeps when idle, so the first visit can take about a minute while it wakes up.
 
 ## Status & roadmap
 

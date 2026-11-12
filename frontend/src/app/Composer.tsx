@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowUp, Crown, Loader2, Lock, Sparkles, TriangleAlert } from 'lucide-react'
+import { ArrowUp, Crown, KeyRound, Loader2, Lock, Sparkles, TriangleAlert } from 'lucide-react'
 import clsx from 'clsx'
 import { useApp } from './store'
 import { api, ApiError } from '../lib/api'
 import { go, takePrefill } from '../lib/router'
+import { startRun } from '../lib/runs'
 import { Button, Eyebrow } from '../components/ui'
 
 const EXAMPLES = [
@@ -15,15 +16,16 @@ const EXAMPLES = [
 ]
 
 export default function Composer() {
-  const { providers, defaultProvider, fastModels, account, refreshRuns, refreshAccount } = useApp()
+  const { providers, defaultProvider, fastModels, account, ownKey, houseRunsLeft, houseRunsPerDay } = useApp()
   const [task, setTask] = useState('')
   const [provider, setProvider] = useState<string>('')
   const [model, setModel] = useState<string>('')
   const [models, setModels] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<{ msg: string; upgrade: boolean } | null>(null)
+  const [error, setError] = useState<{ msg: string; upgrade?: boolean; addKey?: boolean } | null>(null)
   const ta = useRef<HTMLTextAreaElement>(null)
   const isFree = account?.plan.models === 'fast'
+  const onHouseKey = provider === 'groq' && !ownKey
 
   useEffect(() => {
     const p = takePrefill()
@@ -58,15 +60,22 @@ export default function Composer() {
 
   const submit = async () => {
     if (task.trim().length < 3 || busy) return
-    setBusy(true)
     setError(null)
+    if (account && account.usage.runs_today >= account.usage.runs_per_day) {
+      setError({ msg: `Daily limit reached (${account.usage.runs_per_day} runs on the ${account.plan.name} plan). Upgrade to Pro for more.`, upgrade: true })
+      return
+    }
+    if (onHouseKey && houseRunsLeft <= 0) {
+      setError({ msg: `You've used today's ${houseRunsPerDay} free runs on our key. Add your own free Groq key for unlimited runs.`, addKey: true })
+      return
+    }
+    setBusy(true)
     try {
-      const run = await api.createRun(task.trim(), provider || undefined, model || undefined)
-      await Promise.all([refreshRuns(), refreshAccount()])
-      go(`/app/run/${run.id}`)
+      const id = await startRun({ task: task.trim(), provider: provider || undefined, model: model || undefined, plan_id: account?.plan.id ?? 'free' })
+      go(`/app/run/${id}`)
     } catch (e) {
       const err = e as ApiError
-      setError({ msg: err.message, upgrade: err.status === 402 })
+      setError({ msg: err.message, upgrade: err.status === 402, addKey: err.status === 429 })
     } finally {
       setBusy(false)
     }
@@ -103,8 +112,8 @@ export default function Composer() {
             <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
               <div className="flex flex-wrap gap-1 rounded-full bg-ink-3/70 p-1">
                 {providers.map((p) => (
-                  <button key={p.name} disabled={!p.configured} onClick={() => setProvider(p.name)}
-                    title={p.configured ? p.label : `Set ${p.key_env} in backend/.env`}
+                  <button key={p.name} disabled={!p.configured && !(p.name === 'groq' && ownKey)} onClick={() => setProvider(p.name)}
+                    title={p.configured ? p.label : `${p.label} isn't configured on this server`}
                     className={clsx('relative rounded-full px-3 py-1 text-[12.5px] transition-colors disabled:cursor-not-allowed disabled:opacity-35',
                       provider === p.name ? 'text-ink' : 'text-mute hover:text-cloud')}>
                     {provider === p.name && <motion.span layoutId="prov" className="absolute inset-0 rounded-full bg-cloud" transition={{ type: 'spring', stiffness: 450, damping: 34 }} />}
@@ -134,17 +143,27 @@ export default function Composer() {
           {error && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className={clsx('mt-4 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 text-[13.5px]',
-                error.upgrade ? 'border-sun/40 bg-sun/10 text-cloud' : 'border-err/30 bg-err/10 text-err')}>
-              {error.upgrade ? <Crown size={16} className="text-sun" /> : <TriangleAlert size={16} />}
+                error.upgrade || error.addKey ? 'border-sun/40 bg-sun/10 text-cloud' : 'border-err/30 bg-err/10 text-err')}>
+              {error.upgrade || error.addKey ? <Crown size={16} className="text-sun" /> : <TriangleAlert size={16} />}
               <span className="flex-1">{error.msg}</span>
               {error.upgrade && <Button size="sm" onClick={() => go('/app/billing')}>Upgrade</Button>}
+              {error.addKey && <Button size="sm" onClick={() => go('/app/providers')}><KeyRound size={14} />Add my key</Button>}
             </motion.div>
           )}
         </AnimatePresence>
 
         {provider === 'mock' && (
           <p className="mt-4 flex items-center justify-center gap-2 text-center text-[12.5px] text-dim">
-            <Sparkles size={13} className="text-peach" />Simulation mode shows the full flow with placeholder output. Add a GROQ_API_KEY for real results.
+            <Sparkles size={13} className="text-peach" />Simulation mode shows the full flow with placeholder output, no key needed.
+          </p>
+        )}
+        {provider === 'groq' && (
+          <p className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[12.5px] text-dim">
+            <KeyRound size={12} className="text-sun" />
+            {ownKey
+              ? <>Using <span className="text-cloud">your own Groq key</span>: unlimited runs.</>
+              : <><span className="text-cloud">{houseRunsLeft} of {houseRunsPerDay}</span> free runs left today on our key ·
+                  <button className="text-sun hover:underline" onClick={() => go('/app/providers')}>add your own free key for unlimited</button></>}
           </p>
         )}
         {isFree && provider !== 'mock' && (

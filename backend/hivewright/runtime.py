@@ -17,8 +17,8 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 
-from .config import CONTEXT_CHARS, MAX_PARALLEL, RUNS_DIR
-from .plans import Plan, account
+from .config import CONTEXT_CHARS, MAX_PARALLEL
+from .plans import Plan
 from .providers import ChatResult, make_provider
 
 TERMINAL = {"run_completed", "run_failed"}
@@ -126,39 +126,11 @@ class Run:
             "tokens": self.tokens,
         }
 
-    # --- persistence --------------------------------------------------------
-    def save(self) -> None:
-        data = {"summary": self.summary(), "result": self.result, "error": self.error, "events": self.events}
-        (RUNS_DIR / f"{self.id}.json").write_text(json.dumps(data), "utf-8")
-
-    @classmethod
-    def load(cls, path) -> "Run":
-        d = json.loads(path.read_text("utf-8"))
-        s = d["summary"]
-        r = cls(s["task"], s["provider"], s["model"], s.get("plan_id", "free"), run_id=s["id"])
-        r.status = s["status"] if s["status"] in ("completed", "failed") else "failed"
-        r.created_at = s["created_at"]
-        r.finished_at = s.get("finished_at")
-        r.tokens = s.get("tokens", 0)
-        r.result = d.get("result", "")
-        r.error = d.get("error", "")
-        r.events = d.get("events", [])
-        for ev in r.events:
-            if ev["type"] in ("agent_spawned", "agent_updated"):
-                a = ev["agent"]
-                r.agents[a["id"]] = Agent(**a)
-        if s["status"] not in ("completed", "failed"):
-            # Server restarted mid-run.
-            r.error = r.error or "Interrupted by server restart"
-            r.emit("run_failed", error=r.error)
-        return r
-
-
 class Society:
-    def __init__(self, run: Run, plan: Plan) -> None:
+    def __init__(self, run: Run, plan: Plan, api_key: str | None = None) -> None:
         self.run = run
         self.plan = plan
-        self.provider = make_provider(run.provider, run.model)
+        self.provider = make_provider(run.provider, run.model, api_key=api_key)
         self.sem = asyncio.Semaphore(MAX_PARALLEL)
         self.memory: list[dict] = []
         self.deliverables: dict[str, dict] = {}  # subtask id -> {agent_id, title, output}
@@ -204,7 +176,6 @@ class Society:
             )
         used = res.prompt_tokens + res.completion_tokens
         self.run.tokens += used
-        account.record_tokens(used)
         agent.tokens += used
         self.run.emit("usage", tokens=self.run.tokens)
         return res
@@ -270,10 +241,6 @@ class Society:
             run.emit("run_failed", error=run.error)
         finally:
             await self.provider.close()
-            try:
-                run.save()
-            except OSError:
-                pass
 
     async def make_plan(self, orch: Agent) -> list[dict]:
         n = self.plan.max_specialists
@@ -442,35 +409,3 @@ class Society:
                                json_mode=False, purpose="synthesize", max_tokens=4000)
         self.update(orch, output=res.content.strip())
         self.say(orch.id, "user", "result", "Final answer ready.")
-
-
-class RunStore:
-    def __init__(self) -> None:
-        self.runs: dict[str, Run] = {}
-        self._tasks: set[asyncio.Task] = set()
-        for p in sorted(RUNS_DIR.glob("run_*.json")):
-            try:
-                r = Run.load(p)
-                self.runs[r.id] = r
-            except (ValueError, KeyError, TypeError, OSError):
-                continue
-
-    def start(self, task: str, provider: str, model: str, plan: Plan) -> Run:
-        run = Run(task, provider, model, plan.id)
-        society = Society(run, plan)  # raises ProviderError early if misconfigured
-        self.runs[run.id] = run
-        run.emit("run_created", run=run.summary())
-        t = asyncio.create_task(society.execute())
-        self._tasks.add(t)
-        t.add_done_callback(self._tasks.discard)
-        return run
-
-    def list(self) -> list[dict]:
-        return [r.summary() for r in sorted(self.runs.values(), key=lambda r: r.created_at, reverse=True)]
-
-    def delete(self, run_id: str) -> bool:
-        r = self.runs.pop(run_id, None)
-        if r is None:
-            return False
-        (RUNS_DIR / f"{run_id}.json").unlink(missing_ok=True)
-        return True

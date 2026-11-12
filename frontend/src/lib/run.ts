@@ -1,4 +1,3 @@
-import { useEffect, useReducer } from 'react'
 import type { Agent, HivewrightEvent, MemoryEntry, Message, RunStatus, RunSummary, Subtask } from './types'
 
 export interface RunState {
@@ -63,33 +62,6 @@ export function applyEvent(s: RunState, ev: HivewrightEvent): RunState {
       break
   }
   return n
-}
-
-type Action = { reset: true } | { ev: HivewrightEvent } | { connected: boolean }
-
-function reducer(s: RunState, a: Action): RunState {
-  if ('reset' in a) return emptyRun()
-  if ('connected' in a) return { ...s, connected: a.connected }
-  return applyEvent(s, a.ev)
-}
-
-/** Subscribe to a run's event stream; replays history then follows live. */
-export function useRun(id: string | null) {
-  const [state, dispatch] = useReducer(reducer, undefined, emptyRun)
-  useEffect(() => {
-    dispatch({ reset: true })
-    if (!id) return
-    const es = new EventSource(`/api/runs/${id}/stream`)
-    es.onopen = () => dispatch({ connected: true })
-    es.onerror = () => dispatch({ connected: false })
-    es.addEventListener('hivewright', (e) => {
-      const ev = JSON.parse((e as MessageEvent).data) as HivewrightEvent
-      dispatch({ ev })
-      if (ev.type === 'run_completed' || ev.type === 'run_failed') es.close()
-    })
-    return () => es.close()
-  }, [id])
-  return state
 }
 
 export const isActive = (s: RunStatus) => s !== 'completed' && s !== 'failed'
