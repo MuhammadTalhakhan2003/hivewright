@@ -28,6 +28,7 @@ Next up: tool use through MCP, so the agents can act inside the apps you already
 
 Fun fact: I'm now officially a manager. My team works 24/7, never asks for a raise, and the only one who ever pushes back is the Reviewer. 😄
 
+🚀 Try it live: https://hivewright.vercel.app
 🔗 Code: https://github.com/MuhammadTalhakhan2003/hivewright
 🌐 More of my work: https://muhammadtalhakhan2003.github.io/PortFolio_Talha/
 

@@ -16,6 +16,10 @@
   <img alt="Groq" src="https://img.shields.io/badge/LLM-Groq%20%7C%20OpenAI%20%7C%20Ollama-1C1D20?logoColor=FFC928" />
 </p>
 
+<p align="center">
+  <a href="https://hivewright.vercel.app"><b>🚀 Try it live: hivewright.vercel.app</b></a>
+</p>
+
 <p align="center"><img src="docs/landing.png" alt="Hivewright landing page" width="100%" /></p>
 
 ---
